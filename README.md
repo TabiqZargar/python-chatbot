@@ -12,8 +12,9 @@ switch to a real model (local or API) without touching the chatbot logic.
 - Provider abstraction: chatbot logic is fully separate from AI backends.
 - Built-in **offline** provider — runs with no API key and no extra packages.
 - Optional **OpenAI-compatible** provider using only the standard library,
-  which works with OpenAI, Google Gemini's OpenAI-compatible endpoint, and
-  local servers such as Ollama / LM Studio / vLLM.
+  which works with OpenAI, Google Gemini's OpenAI-compatible endpoint,
+  Google Gemma 4 on Amazon Bedrock, and local servers such as
+  Ollama / LM Studio / vLLM.
 - Configuration and secrets come from environment variables / `.env` — no
   secrets in code.
 - Graceful error handling, input validation, and in-chat commands.
@@ -150,6 +151,38 @@ Or set the same four variables in your ignored `.env` file (see `.env.example`).
   [Gemini docs](https://ai.google.dev/gemini-api/docs/openai).
 - The Gemini API is a paid, metered service; requests to it may incur charges
   on your Google account.
+
+### Using Google Gemma 4 on Amazon Bedrock (optional)
+
+Gemma 4 models on Amazon Bedrock are served only on the `bedrock-mantle`
+endpoint behind an OpenAI-compatible Chat Completions API, so they work with
+the existing `openai` provider — no boto3, AWS SDK, or extra package is
+needed. Two gotchas from the Bedrock docs: use the `/openai/v1` path prefix
+(not `/v1`), and authenticate with a **Bedrock API key** (this stdlib
+provider sends plain bearer-token auth; it does not SigV4-sign requests).
+
+```bash
+export CHATBOT_PROVIDER=openai
+export OPENAI_BASE_URL=https://bedrock-mantle.us-east-1.api.aws/openai/v1
+export OPENAI_MODEL=google.gemma-4-31b
+export OPENAI_API_KEY=your-bedrock-api-key
+python main.py
+```
+
+Or set the same four variables in your ignored `.env` file (see `.env.example`).
+
+- Create a Bedrock API key in the [Amazon Bedrock
+  console](https://console.aws.amazon.com/bedrock/home#/api-keys/long-term/create)
+  and enable model access for Gemma 4; keep the key out of version control.
+- Model IDs: `google.gemma-4-31b` (dense, 256K context),
+  `google.gemma-4-26b-a4b` (MoE, cheaper), `google.gemma-4-e2b` (smallest).
+- Regions with Gemma 4: `us-east-1`, `us-east-2`, `us-west-2`,
+  `eu-central-1` (In-Region only — no cross-region profiles). Change the
+  region in the base URL accordingly.
+- Bedrock API keys are region-scoped: a key generated in `us-east-1` fails in
+  other regions with `Credential should be scoped to a valid region`.
+- Bedrock is a paid, metered service; requests may incur charges on your AWS
+  account.
 
 ## Testing
 

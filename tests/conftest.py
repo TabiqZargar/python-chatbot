@@ -51,6 +51,7 @@ class _Handler(BaseHTTPRequestHandler):
             parsed = json.loads(body)
         except json.JSONDecodeError:
             parsed = None
+        server.request_count += 1
         server.last_request = {
             "path": self.path,
             "authorization": self.headers.get("Authorization"),
@@ -83,6 +84,7 @@ class _Server(ThreadingHTTPServer):
             "choices": [{"message": {"role": "assistant", "content": "hi from mock"}}]
         }
         self.last_request: dict[str, Any] | None = None
+        self.request_count = 0
 
 
 @pytest.fixture

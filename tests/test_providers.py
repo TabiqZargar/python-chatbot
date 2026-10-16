@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import urllib.error
+import urllib.request
 from typing import Any
 
 import pytest
@@ -168,7 +170,7 @@ def test_openai_provider_connection_refused(openai_server: Any) -> None:
     server.shutdown()
     server.server_close()
 
-    provider = OpenAICompatibleProvider(base_url=base_url, model="m")
+    provider = OpenAICompatibleProvider(base_url=base_url, model="m", retry_backoff=0.0)
     with pytest.raises(ProviderError) as excinfo:
         provider.send("hi", ())
 
@@ -184,3 +186,72 @@ def test_openai_provider_timeout(openai_server: Any) -> None:
         provider.send("hi", ())
 
     assert "timed out" in str(excinfo.value)
+    assert server.request_count == 1
+
+
+def test_response_body_over_limit_is_rejected(openai_server: Any) -> None:
+    server = openai_server
+    server.reply_raw = b"x" * 4096
+
+    provider = OpenAICompatibleProvider(
+        base_url=_url(server), model="m", max_response_bytes=1024
+    )
+
+    with pytest.raises(ProviderError) as excinfo:
+        provider.send("hi", ())
+
+    assert "exceeded" in str(excinfo.value)
+
+
+def test_safe_connection_refused_is_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts: list[urllib.request.Request] = []
+
+    def fake_urlopen(request: urllib.request.Request, timeout: float = 0.0) -> Any:
+        attempts.append(request)
+        raise urllib.error.URLError(ConnectionRefusedError("refused"))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    provider = OpenAICompatibleProvider(
+        base_url="http://127.0.0.1:1/v1", model="m", max_retries=2, retry_backoff=0.0
+    )
+
+    with pytest.raises(ProviderError) as excinfo:
+        provider.send("hi", ())
+
+    assert "could not reach" in str(excinfo.value)
+    assert len(attempts) == 3
+
+
+def test_timeout_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts: list[urllib.request.Request] = []
+
+    def fake_urlopen(request: urllib.request.Request, timeout: float = 0.0) -> Any:
+        attempts.append(request)
+        raise TimeoutError("slow")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    provider = OpenAICompatibleProvider(
+        base_url="http://127.0.0.1:1/v1", model="m", max_retries=2, retry_backoff=0.0
+    )
+
+    with pytest.raises(ProviderError) as excinfo:
+        provider.send("hi", ())
+
+    assert "timed out" in str(excinfo.value)
+    assert len(attempts) == 1
+
+
+@pytest.mark.parametrize("status", [429, 500, 503])
+def test_http_status_errors_are_not_retried(openai_server: Any, status: int) -> None:
+    server = openai_server
+    server.reply_status = status
+
+    provider = OpenAICompatibleProvider(
+        base_url=_url(server), model="m", max_retries=3, retry_backoff=0.0
+    )
+
+    with pytest.raises(ProviderError) as excinfo:
+        provider.send("hi", ())
+
+    assert str(status) in str(excinfo.value)
+    assert server.request_count == 1

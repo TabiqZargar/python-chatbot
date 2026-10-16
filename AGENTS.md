@@ -29,6 +29,11 @@ git-ignored, `.env.example` is the committed template.
   `chatbot/config.py:SUPPORTED_PROVIDERS`. Default is `offline` (deterministic, no key).
 - `ConversationHistory(limit=N)` caps **user** messages and trims oldest turns, always
   leaving the list starting with a `user` message.
+- `OpenAICompatibleProvider` caps every response body at 10 MiB (`MAX_RESPONSE_BYTES`)
+  via chunked, bounded reads — never `response.read()` unbounded. It retries **only**
+  pre-response connection refusals (`ConnectionRefusedError`); timeouts, mid-stream
+  failures, HTTP errors, 429s and 5xx are never retried. `max_response_bytes`,
+  `max_retries`, and `retry_backoff` are constructor-only knobs (not env config).
 
 ## Configuration
 - Loaded by `chatbot/config.py:load_settings` from `os.environ` then `.env`; real env
@@ -38,6 +43,13 @@ git-ignored, `.env.example` is the committed template.
   (`OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`); the
   `GEMINI_API_KEY` env var is a fallback alias used only when `OPENAI_API_KEY` is
   empty. Do not add a separate Gemini provider class or the Google SDK.
+- Google Gemma 4 on Amazon Bedrock is likewise config-only: it lives only on the
+  `bedrock-mantle` endpoint behind an OpenAI-compatible API, so set
+  `CHATBOT_PROVIDER=openai`,
+  `OPENAI_BASE_URL=https://bedrock-mantle.<region>.api.aws/openai/v1` (the
+  `/openai/v1` prefix is required), `OPENAI_MODEL=google.gemma-4-31b`, and put a
+  Bedrock API key in `OPENAI_API_KEY`. Do not add boto3/botocore, a Bedrock provider
+  class, or a Converse/SigV4 path — the stdlib bearer-token request already works.
 
 ## Testing notes
 - `tests/conftest.py` starts a local `http.server` mock for OpenAI-compatible tests —
