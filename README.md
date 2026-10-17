@@ -3,7 +3,7 @@
 A beginner-friendly, terminal-based AI chatbot written in Python. It keeps
 track of the whole conversation during a session and talks to a pluggable
 "provider" backend, so you can start with the built-in offline demo and later
-switch to a real model (local or API) without touching the chatbot logic.
+switch to a real model (local or API) without touching the chatbot logic..
 
 ## Features
 
@@ -46,7 +46,7 @@ switch to a real model (local or API) without touching the chatbot logic.
 ## Requirements
 
 - Python 3.10 or newer (this project was developed on Python 3.14).
-- No third-party packages are needed to *run* the chatbot.
+- No third-party packages are needed to _run_ the chatbot.
 - `pytest` is needed to run the tests.
 
 ## Setup
@@ -77,15 +77,15 @@ no key.
 All settings are read from environment variables, falling back to values in
 `.env`. Real environment variables always win over `.env`.
 
-| Variable                | Default                       | Purpose                                            |
-| ----------------------- | ----------------------------- | -------------------------------------------------- |
-| `CHATBOT_PROVIDER`      | `offline`                     | `offline` or `openai` (any OpenAI-compatible API). |
-| `OPENAI_API_KEY`        | *(empty)*                     | API key; optional for local servers that need none.|
-| `GEMINI_API_KEY`        | *(empty)*                     | Alias for the key; used only if `OPENAI_API_KEY` is empty. |
-| `OPENAI_BASE_URL`       | `https://api.openai.com/v1`   | API root URL.                                      |
-| `OPENAI_MODEL`          | `gpt-4o-mini`                 | Model name sent to the endpoint.                   |
-| `CHATBOT_TIMEOUT`       | `30`                          | Request timeout in seconds.                        |
-| `CHATBOT_HISTORY_LIMIT` | `50`                          | Max user messages kept in history.                 |
+| Variable                | Default                     | Purpose                                                    |
+| ----------------------- | --------------------------- | ---------------------------------------------------------- |
+| `CHATBOT_PROVIDER`      | `offline`                   | `offline` or `openai` (any OpenAI-compatible API).         |
+| `OPENAI_API_KEY`        | _(empty)_                   | API key; optional for local servers that need none.        |
+| `GEMINI_API_KEY`        | _(empty)_                   | Alias for the key; used only if `OPENAI_API_KEY` is empty. |
+| `OPENAI_BASE_URL`       | `https://api.openai.com/v1` | API root URL.                                              |
+| `OPENAI_MODEL`          | `gpt-4o-mini`               | Model name sent to the endpoint.                           |
+| `CHATBOT_TIMEOUT`       | `30`                        | Request timeout in seconds.                                |
+| `CHATBOT_HISTORY_LIMIT` | `50`                        | Max user messages kept in history.                         |
 
 Never commit a real `.env` — it is listed in `.gitignore`.
 
@@ -101,12 +101,12 @@ python -m chatbot
 
 Inside the chat:
 
-| Command    | Action                                          |
-| ---------- | ----------------------------------------------- |
-| `/help`    | Show available commands.                        |
-| `/history` | Show the conversation so far.                   |
-| `/clear`   | Forget the conversation.                        |
-| `/exit`    | Leave the chat (also `/quit`, `/q`).            |
+| Command    | Action                               |
+| ---------- | ------------------------------------ |
+| `/help`    | Show available commands.             |
+| `/history` | Show the conversation so far.        |
+| `/clear`   | Forget the conversation.             |
+| `/exit`    | Leave the chat (also `/quit`, `/q`). |
 
 `Ctrl-C` and `Ctrl-D` also exit cleanly. Blank input is ignored with a hint.
 
