@@ -3,7 +3,7 @@
 A beginner-friendly, terminal-based AI chatbot written in Python. It keeps
 track of the whole conversation during a session and talks to a pluggable
 "provider" backend, so you can start with the built-in offline demo and later
-switch to a real model (local or API) without touching the chatbot logic..
+switch to a real model (local or API) without touching the chatbot logic.
 
 ## Features
 
@@ -13,6 +13,7 @@ switch to a real model (local or API) without touching the chatbot logic..
 - Built-in **offline** provider — runs with no API key and no extra packages.
 - Optional **OpenAI-compatible** provider using only the standard library,
   which works with OpenAI, Google Gemini's OpenAI-compatible endpoint,
+  Requesty (a multi-model router, including Google Gemma 4),
   Google Gemma 4 on Amazon Bedrock, and local servers such as
   Ollama / LM Studio / vLLM.
 - Configuration and secrets come from environment variables / `.env` — no
@@ -86,6 +87,7 @@ All settings are read from environment variables, falling back to values in
 | `OPENAI_MODEL`          | `gpt-4o-mini`               | Model name sent to the endpoint.                           |
 | `CHATBOT_TIMEOUT`       | `30`                        | Request timeout in seconds.                                |
 | `CHATBOT_HISTORY_LIMIT` | `50`                        | Max user messages kept in history.                         |
+| `CHATBOT_SYSTEM_PROMPT` | _(empty)_                   | System message sent first on `openai` requests; empty = none. |
 
 Never commit a real `.env` — it is listed in `.gitignore`.
 
@@ -183,6 +185,32 @@ Or set the same four variables in your ignored `.env` file (see `.env.example`).
   other regions with `Credential should be scoped to a valid region`.
 - Bedrock is a paid, metered service; requests may incur charges on your AWS
   account.
+
+### Using Requesty (optional)
+
+[Requesty](https://www.requesty.ai) is an OpenAI-compatible router: one base
+URL and one API key give access to hundreds of models from many providers,
+including Google Gemma 4, with automatic failover between providers serving
+the same model. It works with the existing `openai` provider — no extra
+provider, package, or SDK is needed.
+
+```bash
+export CHATBOT_PROVIDER=openai
+export OPENAI_BASE_URL=https://router.requesty.ai/v1
+export OPENAI_MODEL=google/gemma-4-31b-it
+export OPENAI_API_KEY=your-requesty-api-key
+python main.py
+```
+
+Or set the same four variables in your ignored `.env` file (see `.env.example`).
+
+- Get a key at [Requesty](https://www.requesty.ai) and keep it out of version
+  control.
+- Model IDs use a `provider/model` prefix (e.g. `google/gemma-4-31b-it`) to
+  pin one specific deployment, or a bare model name (e.g. `gemma-4-31b-it`)
+  to let Requesty route across providers with automatic failover.
+- Requesty is a paid, metered service (some models have a free tier);
+  requests may incur charges on your Requesty account.
 
 ## Testing
 

@@ -13,6 +13,7 @@ The provider is dormant until you set CHATBOT_PROVIDER=openai.
 
 from __future__ import annotations
 
+import http.client
 import json
 import time
 import urllib.error
@@ -43,6 +44,7 @@ class OpenAICompatibleProvider(ChatProvider):
         max_response_bytes: int = MAX_RESPONSE_BYTES,
         max_retries: int = _DEFAULT_MAX_RETRIES,
         retry_backoff: float = _DEFAULT_RETRY_BACKOFF,
+        system_prompt: str = "",
     ) -> None:
         if not base_url.startswith(("http://", "https://")):
             raise ProviderError(f"invalid base URL: {base_url!r}")
@@ -63,6 +65,7 @@ class OpenAICompatibleProvider(ChatProvider):
         self._max_response_bytes = max_response_bytes
         self._max_retries = max_retries
         self._retry_backoff = retry_backoff
+        self._system_prompt = system_prompt
 
     @property
     def name(self) -> str:
@@ -80,6 +83,8 @@ class OpenAICompatibleProvider(ChatProvider):
             raise ProviderError("openai provider received an empty message")
 
         messages = [item.to_dict() for item in history]
+        if self._system_prompt:
+            messages.insert(0, {"role": "system", "content": self._system_prompt})
         messages.append({"role": "user", "content": message.strip()})
         payload = json.dumps({"model": self._model, "messages": messages}).encode("utf-8")
 
@@ -110,6 +115,25 @@ class OpenAICompatibleProvider(ChatProvider):
             except TimeoutError as exc:
                 raise ProviderError(
                     f"request to {self._base_url} timed out after {self._timeout}s"
+                ) from exc
+            except http.client.HTTPException as exc:
+                # IncompleteRead, BadStatusLine, RemoteDisconnected, LineTooLong, etc.
+                # The connection was interrupted mid-response or the server sent a
+                # malformed HTTP message. Ambiguous — never retried automatically.
+                raise ProviderError(
+                    f"connection to {self._base_url} failed mid-response: {exc}"
+                ) from exc
+            except ConnectionError as exc:
+                # ConnectionResetError, ConnectionAbortedError, BrokenPipeError.
+                # Unlike a refused connection (handshake never completed), the server
+                # may already have received and started processing the request, so
+                # this is never retried automatically.
+                raise ProviderError(
+                    f"connection to {self._base_url} was interrupted: {exc}"
+                ) from exc
+            except UnicodeDecodeError as exc:
+                raise ProviderError(
+                    f"{self._model} returned a response that was not valid UTF-8 text"
                 ) from exc
 
             return _extract_reply(body, self._model)

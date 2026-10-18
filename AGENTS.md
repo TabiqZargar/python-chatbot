@@ -2,8 +2,8 @@
 
 ## Repo state
 Working Python chatbot (package `chatbot/`, entrypoints `main.py` and
-`python -m chatbot`). Git repo is initialized with no commits yet; `.env` is
-git-ignored, `.env.example` is the committed template.
+`python -m chatbot`). `.env` is git-ignored, `.env.example` is the committed
+template.
 
 ## Commands (run from repo root)
 - Tests: `.venv/bin/python -m pytest` (pytest is preinstalled in `.venv`; the suite is
@@ -32,13 +32,22 @@ git-ignored, `.env.example` is the committed template.
 - `OpenAICompatibleProvider` caps every response body at 10 MiB (`MAX_RESPONSE_BYTES`)
   via chunked, bounded reads — never `response.read()` unbounded. It retries **only**
   pre-response connection refusals (`ConnectionRefusedError`); timeouts, mid-stream
-  failures, HTTP errors, 429s and 5xx are never retried. `max_response_bytes`,
-  `max_retries`, and `retry_backoff` are constructor-only knobs (not env config).
+  failures (`ConnectionError`, `http.client.HTTPException`), HTTP errors, 429s, 5xx,
+  and non-UTF-8 bodies are never retried — all surface as `ProviderError`, never raw
+  exceptions. `max_response_bytes`, `max_retries`, and `retry_backoff` are
+  constructor-only knobs (not env config).
+- The CLI (`chatbot/cli.py`) catches `KeyboardInterrupt` around both the input prompt
+  **and** `bot.chat()` so Ctrl-C during an in-flight API request exits cleanly instead
+  of crashing with a traceback.
 
 ## Configuration
 - Loaded by `chatbot/config.py:load_settings` from `os.environ` then `.env`; real env
   vars override `.env`. Secrets never go in code. Invalid values raise `ConfigError`.
 - `OPENAI_API_KEY` may be empty (local servers like Ollama/LM Studio need none).
+- `CHATBOT_SYSTEM_PROMPT` defaults to empty; when set, `OpenAICompatibleProvider`
+  prepends it as a `{"role": "system", ...}` message before history. The value is
+  loaded **unstripped** (whitespace/Unicode are meaningful), and the offline
+  provider ignores it entirely.
 - Gemini is supported by config-only reuse of the `openai` provider
   (`OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`); the
   `GEMINI_API_KEY` env var is a fallback alias used only when `OPENAI_API_KEY` is
@@ -50,6 +59,11 @@ git-ignored, `.env.example` is the committed template.
   `/openai/v1` prefix is required), `OPENAI_MODEL=google.gemma-4-31b`, and put a
   Bedrock API key in `OPENAI_API_KEY`. Do not add boto3/botocore, a Bedrock provider
   class, or a Converse/SigV4 path — the stdlib bearer-token request already works.
+- Requesty is likewise config-only: it is an OpenAI-compatible multi-model router, so
+  set `CHATBOT_PROVIDER=openai`, `OPENAI_BASE_URL=https://router.requesty.ai/v1`,
+  `OPENAI_MODEL` to a Requesty model id (e.g. `google/gemma-4-31b-it` to pin a
+  deployment, or a bare name like `gemma-4-31b-it` for automatic failover), and put a
+  Requesty key in `OPENAI_API_KEY`. Do not add a Requesty provider class or SDK.
 
 ## Testing notes
 - `tests/conftest.py` starts a local `http.server` mock for OpenAI-compatible tests —

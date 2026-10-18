@@ -25,6 +25,7 @@ def build_provider(settings: Settings) -> ChatProvider:
             base_url=settings.openai_base_url,
             model=settings.openai_model,
             timeout=settings.timeout,
+            system_prompt=settings.system_prompt,
         )
     raise ConfigError(
         f"unknown provider {settings.provider!r}; supported: {SUPPORTED_PROVIDERS}"

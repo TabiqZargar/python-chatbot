@@ -26,6 +26,7 @@ DEFAULT_HISTORY_LIMIT = 50
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TIMEOUT = 30.0
+DEFAULT_SYSTEM_PROMPT = ""
 
 
 def parse_dotenv(path: Path | str) -> dict[str, str]:
@@ -70,6 +71,7 @@ class Settings:
     openai_base_url: str = DEFAULT_BASE_URL
     openai_model: str = DEFAULT_MODEL
     timeout: float = DEFAULT_TIMEOUT
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
 
 def load_settings(
@@ -104,6 +106,8 @@ def load_settings(
     base_url = raw("OPENAI_BASE_URL", DEFAULT_BASE_URL).strip().rstrip("/")
     model = raw("OPENAI_MODEL", DEFAULT_MODEL).strip()
     api_key = raw("OPENAI_API_KEY").strip() or raw("GEMINI_API_KEY").strip()
+    # Not stripped: whitespace inside the prompt is meaningful and preserved verbatim.
+    system_prompt = raw("CHATBOT_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
 
     if provider == "openai":
         if not base_url:
@@ -122,6 +126,7 @@ def load_settings(
         openai_base_url=base_url,
         openai_model=model,
         timeout=timeout,
+        system_prompt=system_prompt,
     )
 
 

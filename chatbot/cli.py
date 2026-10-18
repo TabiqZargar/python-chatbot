@@ -100,6 +100,10 @@ def chat_loop(
         except ChatbotError as exc:
             print_fn(f"Error: {exc}")
             continue
+        except KeyboardInterrupt:
+            print_fn("")
+            print_fn("Goodbye!")
+            return 0
         print_fn(f"Bot> {reply}")
 
 

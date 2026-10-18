@@ -59,6 +59,20 @@ def test_keyboard_interrupt_exits_cleanly() -> None:
     assert "Goodbye!" in outputs
 
 
+def test_keyboard_interrupt_during_request_exits_cleanly() -> None:
+    """Ctrl-C while a provider request is in flight exits cleanly, not with a traceback."""
+
+    class _InterruptingProvider(OfflineProvider):
+        def send(self, message, history):
+            raise KeyboardInterrupt()
+
+    bot = Chatbot(_InterruptingProvider(), history=ConversationHistory(limit=10))
+    code, outputs = run_loop(["hello"], bot=bot)
+
+    assert code == 0
+    assert "Goodbye!" in outputs
+
+
 def test_empty_input_is_rejected_but_loop_continues() -> None:
     code, outputs = run_loop(["   ", "/exit"])
 

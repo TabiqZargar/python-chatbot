@@ -133,3 +133,48 @@ def test_missing_dotenv_file_is_ignored(tmp_path: Path) -> None:
     assert parse_dotenv(tmp_path / "does-not-exist") == {}
     settings = load_settings(environ={}, dotenv_path=tmp_path / "does-not-exist")
     assert settings.provider == "offline"
+
+
+# --- CHATBOT_SYSTEM_PROMPT ---
+
+
+def test_system_prompt_defaults_to_empty() -> None:
+    settings = load_settings(environ={}, dotenv_path=None)
+
+    assert settings.system_prompt == ""
+
+
+def test_system_prompt_from_environment() -> None:
+    settings = load_settings(
+        environ={"CHATBOT_SYSTEM_PROMPT": "You are a helpful assistant."},
+        dotenv_path=None,
+    )
+
+    assert settings.system_prompt == "You are a helpful assistant."
+
+
+def test_system_prompt_from_dotenv_file(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("CHATBOT_SYSTEM_PROMPT=Answer briefly.\n", encoding="utf-8")
+
+    settings = load_settings(environ={}, dotenv_path=env_file)
+
+    assert settings.system_prompt == "Answer briefly."
+
+
+def test_system_prompt_preserves_whitespace_and_unicode() -> None:
+    """Internal/trailing whitespace and Unicode must survive loading verbatim."""
+    prompt = "  indented 日本語\n  with trailing spaces   \n"
+
+    settings = load_settings(environ={"CHATBOT_SYSTEM_PROMPT": prompt}, dotenv_path=None)
+
+    assert settings.system_prompt == prompt
+
+
+def test_empty_system_prompt_stays_empty(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("CHATBOT_SYSTEM_PROMPT=\n", encoding="utf-8")
+
+    settings = load_settings(environ={}, dotenv_path=env_file)
+
+    assert settings.system_prompt == ""
