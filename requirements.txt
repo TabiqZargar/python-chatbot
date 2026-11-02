@@ -1,0 +1,6 @@
+# Runtime dependency for the web interface.
+# The Ollama client and SQLite storage use only the Python standard library.
+gradio>=6.0,<7
+
+# Development / test dependency (also install with: pip install -r requirements.txt)
+pytest>=8.0

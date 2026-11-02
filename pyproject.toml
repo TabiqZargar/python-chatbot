@@ -1,12 +1,13 @@
 [project]
 name = "python-chatbot"
 version = "0.1.0"
-description = "Beginner-friendly terminal AI chatbot with pluggable providers."
+description = "Local AI chatbot with a Gradio/Ollama web UI and a terminal interface."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
+web = ["gradio>=6.0,<7"]
 dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]

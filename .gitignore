@@ -16,6 +16,14 @@ dist/
 venv/
 env/
 
+# Local chatbot data (conversations are private)
+*.db
+*.db-wal
+*.db-shm
+
+# Gradio cache / flags
+.gradio/
+
 # Test / coverage caches
 .pytest_cache/
 .coverage

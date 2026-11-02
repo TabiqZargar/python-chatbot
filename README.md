@@ -1,240 +1,287 @@
-# Python AI Chatbot
+# Local AI Chatbot
 
-A beginner-friendly, terminal-based AI chatbot written in Python. It keeps
-track of the whole conversation during a session and talks to a pluggable
-"provider" backend, so you can start with the built-in offline demo and later
-switch to a real model (local or API) without touching the chatbot logic.
+A private, local-first AI chatbot with a polished Gradio web interface. It runs
+models through [Ollama](https://ollama.com) on your own machine, streams replies
+token by token, and stores conversations in a local SQLite database. There is no
+cloud API, no account, and no telemetry.
+
+The original terminal chatbot is still included and still works. The new web app
+is the recommended interface.
 
 ## Features
 
-- Terminal (command-line) chat interface.
-- Multi-turn conversations with in-session history.
-- Provider abstraction: chatbot logic is fully separate from AI backends.
-- Built-in **offline** provider — runs with no API key and no extra packages.
-- Optional **OpenAI-compatible** provider using only the standard library,
-  which works with OpenAI, Google Gemini's OpenAI-compatible endpoint,
-  Requesty (a multi-model router, including Google Gemma 4),
-  Google Gemma 4 on Amazon Bedrock, and local servers such as
-  Ollama / LM Studio / vLLM.
-- Configuration and secrets come from environment variables / `.env` — no
-  secrets in code.
-- Graceful error handling, input validation, and in-chat commands.
-- Automated tests with `pytest`, including history and error-handling tests.
+- **Fully local inference** through Ollama; no cloud fallback.
+- **Streaming replies** with Markdown rendering and copy buttons.
+- **Persistent conversations** in SQLite: titles, messages, model, and settings.
+- **Multi-turn context** with a configurable history limit.
+- **Model picker** populated from models installed in Ollama.
+- **System prompt presets** plus custom prompts, temperature, and token limits.
+- **Conversation management**: new chat, rename, delete, clear, and regenerate.
+- **Stop generation**, with partial replies saved instead of lost.
+- **Connection checks** with setup help instead of silent failures or mock replies.
+- **Responsive light/dark UI** with a collapsible conversation sidebar.
+- **No model downloads from the app**; you choose and pull models yourself.
 
-## Project structure
+## Quick start
 
-```
-.
-├── main.py                     # entrypoint: python main.py
-├── pyproject.toml              # metadata + pytest config
-├── .env.example                # template for your .env (safe to commit)
-├── .gitignore                  # ignores .env, caches, venv
-├── chatbot/
-│   ├── config.py               # env + .env loading and validation
-│   ├── errors.py               # ChatbotError hierarchy
-│   ├── history.py              # ConversationHistory (size-limited, ordered)
-│   ├── chatbot.py              # core logic: validate -> provider -> record
-│   ├── cli.py                  # terminal loop + commands
-│   ├── __main__.py             # python -m chatbot
-│   └── providers/
-│       ├── base.py             # ChatProvider interface
-│       ├── offline.py          # built-in, deterministic, no network
-│       ├── openai_compatible.py# any OpenAI-compatible HTTP endpoint
-│       └── __init__.py         # build_provider(settings) factory
-└── tests/                      # pytest suite
+### 1. Install Ollama
+
+Install Ollama from <https://ollama.com/download>, or use your package manager.
+
+```bash
+ollama serve
 ```
 
-## Requirements
+Ollama listens on `http://127.0.0.1:11434` by default.
 
-- Python 3.10 or newer (this project was developed on Python 3.14).
-- No third-party packages are needed to _run_ the chatbot.
-- `pytest` is needed to run the tests.
+### 2. Pull a model
 
-## Setup
+The app never downloads models automatically. Pull one in a terminal:
 
-The project already has a virtual environment at `.venv/`. Activate it:
+```bash
+# Small models suited to machines with about 4 GB of RAM
+ollama pull qwen2.5:1.5b
+ollama pull llama3.2:1b
+
+# A good balance if you have a little more memory
+ollama pull qwen2.5:3b
+ollama pull llama3.2:3b
+```
+
+Check what is installed at any time:
+
+```bash
+ollama list
+```
+
+### 3. Install the app
+
+The repository already has a virtual environment at `.venv/`:
 
 ```bash
 source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Install the test dependency (only needed to run tests):
+The Ollama client and SQLite storage use only the Python standard library.
+Gradio is the only runtime dependency; pytest is included for development.
 
-```bash
-pip install pytest
-```
-
-Create your local configuration file (never commit the real `.env`):
+### 4. Configure (optional)
 
 ```bash
 cp .env.example .env
 ```
 
-The defaults use the offline provider, so the chatbot works immediately with
-no key.
+The defaults work with a standard local Ollama install. Edit `.env` only if you
+want a different model, port, database path, or generation defaults. Real
+environment variables override values from `.env`.
+
+### 5. Run
+
+```bash
+python app.py
+```
+
+Then open <http://127.0.0.1:7860>.
+
+The sidebar shows Ollama connection state and installed models. If Ollama is not
+running, the app explains how to start it and offers a **Retry connection**
+button.
 
 ## Configuration
 
-All settings are read from environment variables, falling back to values in
-`.env`. Real environment variables always win over `.env`.
+All new-app settings are read from environment variables first, then `.env`.
 
-| Variable                | Default                     | Purpose                                                    |
-| ----------------------- | --------------------------- | ---------------------------------------------------------- |
-| `CHATBOT_PROVIDER`      | `offline`                   | `offline` or `openai` (any OpenAI-compatible API).         |
-| `OPENAI_API_KEY`        | _(empty)_                   | API key; optional for local servers that need none.        |
-| `GEMINI_API_KEY`        | _(empty)_                   | Alias for the key; used only if `OPENAI_API_KEY` is empty. |
-| `OPENAI_BASE_URL`       | `https://api.openai.com/v1` | API root URL.                                              |
-| `OPENAI_MODEL`          | `gpt-4o-mini`               | Model name sent to the endpoint.                           |
-| `CHATBOT_TIMEOUT`       | `30`                        | Request timeout in seconds.                                |
-| `CHATBOT_HISTORY_LIMIT` | `50`                        | Max user messages kept in history.                         |
-| `CHATBOT_SYSTEM_PROMPT` | _(empty)_                   | System message sent first on `openai` requests; empty = none. |
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Local Ollama server URL. |
+| `OLLAMA_MODEL` | `qwen2.5:3b` | Model selected at startup. Must be installed. |
+| `OLLAMA_TIMEOUT` | `120` | Read/connection timeout in seconds. |
+| `CHATBOT_HISTORY_LIMIT` | `30` | Maximum user turns sent as context. |
+| `CHATBOT_MAX_MESSAGE_LENGTH` | `8000` | Maximum characters in one user message. |
+| `CHATBOT_TEMPERATURE` | `0.7` | Sampling temperature, `0.0`–`2.0`. |
+| `CHATBOT_MAX_TOKENS` | `1024` | Maximum tokens in one reply. |
+| `CHATBOT_SYSTEM_PROMPT` | helpful general prompt | Default system prompt. Empty means none. |
+| `CHATBOT_DB_PATH` | `chatbot.db` | SQLite database location. |
+| `CHATBOT_UI_HOST` | `127.0.0.1` | Web server bind address. Keep local by default. |
+| `CHATBOT_UI_PORT` | `7860` | Web server port. |
+| `CHATBOT_UI_SHARE` | `false` | Create a public Gradio share link. Use only intentionally. |
 
-Never commit a real `.env` — it is listed in `.gitignore`.
+Invalid values stop startup with a clear `ConfigError` message rather than a
+traceback.
 
-## Usage
+### Legacy `.env` values
 
-Run the chatbot from the project root:
+The original terminal app uses `CHATBOT_PROVIDER`, `OPENAI_API_KEY`,
+`OPENAI_BASE_URL`, `OPENAI_MODEL`, and `CHATBOT_TIMEOUT`. The new web app ignores
+those names; it only talks to `OLLAMA_BASE_URL`. They are documented at the
+bottom of `.env.example` for the legacy terminal interface.
+
+## Using the web app
+
+- **New chat** clears the composer and starts a fresh conversation without
+  changing your model or settings.
+- **Conversation history** loads any saved chat; its model and settings are
+  restored with it.
+- **Rename / Delete / Clear messages** manage the selected conversation.
+- **Settings** changes model, system prompt, temperature, and maximum tokens.
+- **Regenerate** replaces the latest assistant reply using the same user message.
+- **Stop** ends an in-flight generation and keeps whatever text arrived.
+- **Toggle light / dark theme** switches the interface theme.
+
+Conversations are saved after every successful or partial reply. Closing the app
+does not lose your history.
+
+## Storage
+
+Conversations live in `chatbot.db` by default:
+
+- `conversations` stores the title, model, system prompt, temperature, and token
+  limit for each chat.
+- `messages` stores user and assistant messages in order. Deleting a
+  conversation deletes its messages.
+- `preferences` stores the last-used defaults.
+
+The database is local and private. To start over, stop the app and delete
+`chatbot.db` (or point `CHATBOT_DB_PATH` somewhere else). SQLite WAL sidecar
+files may also exist (`chatbot.db-wal`, `chatbot.db-shm`); they are covered by
+`.gitignore`.
+
+## Testing
+
+The full suite is offline and needs no Ollama install, model, or API key:
 
 ```bash
-python main.py
-# or
-python -m chatbot
+.venv/bin/python -m pytest
 ```
 
-Inside the chat:
+Run one file or test:
 
-| Command    | Action                               |
-| ---------- | ------------------------------------ |
-| `/help`    | Show available commands.             |
-| `/history` | Show the conversation so far.        |
-| `/clear`   | Forget the conversation.             |
-| `/exit`    | Leave the chat (also `/quit`, `/q`). |
+```bash
+.venv/bin/python -m pytest tests/test_engine.py
+.venv/bin/python -m pytest tests/test_engine.py::test_closing_generator_saves_partial_reply
+```
 
-`Ctrl-C` and `Ctrl-D` also exit cleanly. Blank input is ignored with a hint.
+The Ollama tests start a local mock HTTP server. UI-construction tests verify
+that building the app performs no network calls.
 
-### Using a real model (optional)
+## Project structure
 
-Point the chatbot at any OpenAI-compatible endpoint. For a local Ollama
-server:
+```text
+.
+├── app.py                      # new Gradio web app entrypoint
+├── config.py                   # validated web-app settings
+├── database/
+│   ├── db.py                   # thread-safe SQLite repository
+│   └── models.py               # Conversation, ChatMessage, preferences
+├── ui/
+│   └── components.py           # Gradio layout and event handlers
+├── chatbot/
+│   ├── engine.py               # streaming orchestration + persistence
+│   ├── ollama_client.py        # stdlib Ollama HTTP/streaming client
+│   ├── conversation.py         # validation, titles, context trimming
+│   ├── prompts.py              # prompt presets and setup help
+│   ├── errors.py               # shared exception hierarchy
+│   ├── config.py               # legacy terminal settings
+│   ├── chatbot.py              # legacy terminal chatbot logic
+│   ├── cli.py                  # legacy terminal loop
+│   ├── history.py              # legacy in-session history
+│   ├── __main__.py             # python -m chatbot
+│   └── providers/              # legacy pluggable providers
+├── tests/                      # offline pytest suite
+├── main.py                     # legacy terminal entrypoint
+├── requirements.txt            # gradio + pytest
+└── .env.example                # configuration template
+```
+
+## How it works
+
+1. The UI builds a `ChatOptions` payload from the selected model and settings.
+2. `ChatEngine` saves the user message, trims old context, then calls
+   `OllamaClient`.
+3. `OllamaClient` streams newline-delimited JSON from Ollama's `/api/chat`
+   endpoint and yields text chunks.
+4. The UI renders chunks as they arrive. On completion, stop, or error, the
+   engine saves the full or partial assistant reply.
+5. `Database` persists everything in SQLite behind a re-entrant lock so Gradio's
+   worker threads cannot corrupt a transaction.
+
+There is deliberately no mock response in the web app: if Ollama is unavailable,
+the UI says so and does not pretend to answer.
+
+## Troubleshooting
+
+**"Ollama is not reachable"**
+
+Start the server with `ollama serve`, confirm `ollama list` works in a terminal,
+then click **Retry connection**.
+
+**"Model ... is not available"**
+
+The app does not download models. Run `ollama pull <model>` for the exact name
+shown in the error, then retry.
+
+**The first reply is slow**
+
+The first request may load several gigabytes into memory. Wait for the model to
+load; later replies are faster. `OLLAMA_TIMEOUT` controls how long the client
+waits.
+
+**Out-of-memory or server errors**
+
+Use a smaller quantized model, for example `qwen2.5:1.5b` or `llama3.2:1b`.
+Close other memory-heavy applications. A 7B model generally needs more than this
+machine's available RAM.
+
+**Port 7860 is already in use**
+
+Set another port:
+
+```bash
+CHATBOT_UI_PORT=7861 python app.py
+```
+
+## Legacy terminal chatbot
+
+The original terminal interface remains available:
+
+```bash
+.venv/bin/python main.py
+# or
+.venv/bin/python -m chatbot
+```
+
+It uses the provider abstraction in `chatbot/providers/` and its own settings in
+`chatbot/config.py`. The default `offline` provider is deterministic and needs no
+key. It can also talk to OpenAI-compatible endpoints, including local Ollama,
+Gemini, Requesty, and Google Gemma 4 on Amazon Bedrock.
+
+Example: use the legacy terminal app with a local Ollama model:
 
 ```bash
 export CHATBOT_PROVIDER=openai
 export OPENAI_BASE_URL=http://localhost:11434/v1
-export OPENAI_MODEL=llama3
+export OPENAI_MODEL=qwen2.5:3b
 python main.py
 ```
 
-The OpenAI-compatible provider uses only Python's standard library
-(`urllib`) — no extra package is installed. **No paid dependency is added by
-default.** If you point `OPENAI_BASE_URL` at a paid service such as OpenAI and
-set `OPENAI_API_KEY`, that service may charge you; use a local server or your
-own budget to avoid costs.
+Terminal commands are `/help`, `/history`, `/clear`, and `/exit` (also `/quit`
+or `/q`). The legacy app keeps history only for the current session; the new web
+app persists it in SQLite.
 
-### Using Google Gemini (optional)
+### Legacy provider notes
 
-Gemini offers an official OpenAI-compatible endpoint, so it works with the
-existing `openai` provider — no extra provider, package, or Google SDK.
+- **Gemini**: set `CHATBOT_PROVIDER=openai`,
+  `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, a
+  Gemini model in `OPENAI_MODEL`, and `GEMINI_API_KEY` (or
+  `OPENAI_API_KEY`).
+- **Requesty**: set `CHATBOT_PROVIDER=openai`,
+  `OPENAI_BASE_URL=https://router.requesty.ai/v1`, a Requesty model id in
+  `OPENAI_MODEL`, and your key in `OPENAI_API_KEY`.
+- **Google Gemma 4 on Amazon Bedrock**: set `CHATBOT_PROVIDER=openai`,
+  `OPENAI_BASE_URL=https://bedrock-mantle.<region>.api.aws/openai/v1`,
+  `OPENAI_MODEL=google.gemma-4-31b`, and a Bedrock API key in
+  `OPENAI_API_KEY`. The `/openai/v1` prefix is required.
 
-```bash
-export CHATBOT_PROVIDER=openai
-export OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-export OPENAI_MODEL=gemini-3.5-flash
-export GEMINI_API_KEY=your-key-from-ai-studio
-python main.py
-```
-
-Or set the same four variables in your ignored `.env` file (see `.env.example`).
-
-- Get a key at [Google AI Studio](https://aistudio.google.com/apikey); keep it
-  out of version control.
-- `GEMINI_API_KEY` is a convenience alias for `OPENAI_API_KEY`. If both are
-  set, `OPENAI_API_KEY` wins.
-- Model IDs change over time — use a current Gemini model name from the
-  [Gemini docs](https://ai.google.dev/gemini-api/docs/openai).
-- The Gemini API is a paid, metered service; requests to it may incur charges
-  on your Google account.
-
-### Using Google Gemma 4 on Amazon Bedrock (optional)
-
-Gemma 4 models on Amazon Bedrock are served only on the `bedrock-mantle`
-endpoint behind an OpenAI-compatible Chat Completions API, so they work with
-the existing `openai` provider — no boto3, AWS SDK, or extra package is
-needed. Two gotchas from the Bedrock docs: use the `/openai/v1` path prefix
-(not `/v1`), and authenticate with a **Bedrock API key** (this stdlib
-provider sends plain bearer-token auth; it does not SigV4-sign requests).
-
-```bash
-export CHATBOT_PROVIDER=openai
-export OPENAI_BASE_URL=https://bedrock-mantle.us-east-1.api.aws/openai/v1
-export OPENAI_MODEL=google.gemma-4-31b
-export OPENAI_API_KEY=your-bedrock-api-key
-python main.py
-```
-
-Or set the same four variables in your ignored `.env` file (see `.env.example`).
-
-- Create a Bedrock API key in the [Amazon Bedrock
-  console](https://console.aws.amazon.com/bedrock/home#/api-keys/long-term/create)
-  and enable model access for Gemma 4; keep the key out of version control.
-- Model IDs: `google.gemma-4-31b` (dense, 256K context),
-  `google.gemma-4-26b-a4b` (MoE, cheaper), `google.gemma-4-e2b` (smallest).
-- Regions with Gemma 4: `us-east-1`, `us-east-2`, `us-west-2`,
-  `eu-central-1` (In-Region only — no cross-region profiles). Change the
-  region in the base URL accordingly.
-- Bedrock API keys are region-scoped: a key generated in `us-east-1` fails in
-  other regions with `Credential should be scoped to a valid region`.
-- Bedrock is a paid, metered service; requests may incur charges on your AWS
-  account.
-
-### Using Requesty (optional)
-
-[Requesty](https://www.requesty.ai) is an OpenAI-compatible router: one base
-URL and one API key give access to hundreds of models from many providers,
-including Google Gemma 4, with automatic failover between providers serving
-the same model. It works with the existing `openai` provider — no extra
-provider, package, or SDK is needed.
-
-```bash
-export CHATBOT_PROVIDER=openai
-export OPENAI_BASE_URL=https://router.requesty.ai/v1
-export OPENAI_MODEL=google/gemma-4-31b-it
-export OPENAI_API_KEY=your-requesty-api-key
-python main.py
-```
-
-Or set the same four variables in your ignored `.env` file (see `.env.example`).
-
-- Get a key at [Requesty](https://www.requesty.ai) and keep it out of version
-  control.
-- Model IDs use a `provider/model` prefix (e.g. `google/gemma-4-31b-it`) to
-  pin one specific deployment, or a bare model name (e.g. `gemma-4-31b-it`)
-  to let Requesty route across providers with automatic failover.
-- Requesty is a paid, metered service (some models have a free tier);
-  requests may incur charges on your Requesty account.
-
-## Testing
-
-Run the whole suite:
-
-```bash
-pytest
-```
-
-Run one file or one test:
-
-```bash
-pytest tests/test_history.py
-pytest tests/test_chatbot.py::test_provider_error_propagates_and_history_unchanged
-```
-
-The tests use a local mock HTTP server (standard library) for the
-OpenAI-compatible provider, so they need no network and no API key.
-
-## Error handling
-
-- Invalid input (empty or too long) is rejected with a friendly message and
-  the conversation continues.
-- Provider failures (network, HTTP status, bad JSON, timeouts) are reported as
-  errors and never corrupt history — a failed turn is not recorded.
-- Invalid configuration (bad provider name, limits, or URL) stops startup with
-  a clear message instead of a traceback.
+These are paid, metered services when pointed at a cloud provider. The new web
+app does not use them; it is local-only.

@@ -11,6 +11,8 @@ __all__ = [
     "ConfigError",
     "InvalidInputError",
     "ProviderError",
+    "OllamaError",
+    "StorageError",
 ]
 
 
@@ -28,3 +30,11 @@ class InvalidInputError(ChatbotError):
 
 class ProviderError(ChatbotError):
     """Raised when an AI provider request fails or returns bad data."""
+
+
+class OllamaError(ProviderError):
+    """Raised when the local Ollama server cannot satisfy a request."""
+
+
+class StorageError(ChatbotError):
+    """Raised when the SQLite database cannot be read or written."""
